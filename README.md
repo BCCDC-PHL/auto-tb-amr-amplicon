@@ -1,4 +1,4 @@
-# auto-flu
+# auto-tb-amr-amplicon
 Automated analysis of Mycobacterium tuberculosis (TB) Antimicrobial Resistance (AMR) amplicon sequence data using
 the [BCCDC-PHL/AMR-TB-amplicon-artic-nf](https://github.com/BCCDC-PHL/AMR-TB-amplicon-artic-nf) pipeline.
 
