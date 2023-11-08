@@ -1,0 +1,30 @@
+{
+  "fastq_by_run_dir": "/path/to/fastq_symlinks_by_run",
+  "analysis_output_dir": "/path/to/analysis_by_run",
+  "analysis_work_dir": "/path/to/work-auto-tb-amr-amplicon",
+  "excluded_runs_list": "/path/to/excluded_runs.csv",
+  "notification_email_addresses": [
+	"someone@example.org",
+	"someone_else@example.org"
+  ],
+  "send_notification_emails": true,
+  "scan_interval_seconds": 3600,
+  "pipelines": [
+    {
+      "pipeline_name": "BCCDC-PHL/AMR-TB-amplicon-artic-nf",
+      "pipeline_version": "main",
+      "pipeline_parameters": {
+  	    "prefix": null,
+   	    "bed": "/path/to/primers.bed",
+   	    "ref": "/path/to/ref.fa",
+	    "composite_ref": "/path/to/composite_ref.fa",
+	    "references_amplicons": "/path/to/tbAMR_amplicons",
+	    "references_amplicons_abscessus": "/path/to/abscessusAMR_amplicons",
+	    "primer_pairs_tsv": "/path/to/primer_pairs.tsv",
+	    "db": "/path/to/hsp65_database",
+	    "directory": null,
+	    "outdir": null
+      }
+    }
+  ]
+}
