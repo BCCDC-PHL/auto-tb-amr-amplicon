@@ -17,8 +17,8 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
     subdirs = os.scandir(fastq_by_run_dir)
     analysis_base_outdir = config['analysis_output_dir']
     for pipeline in config['pipelines']:
-        pipeline_version = pipeline['pipeline_version']
-
+        pipeline_minor_version = '.'.join(pipeline['pipeline_version'].split('.')[0:2])
+        pipeline_short_name = pipeline['pipeline_name'].split('/')[1].replace('_', '-')
     for subdir in subdirs:
         run_id = subdir.name
         analysis_outdir = os.path.abspath(os.path.join(analysis_base_outdir))
@@ -28,7 +28,7 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
             ready_to_analyze = os.path.exists(os.path.join(subdir.path, "symlinks_complete.json"))
         else:
             ready_to_analyze = True
-        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id + '-' + pipeline_version + '-output'))
+        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id))
         not_excluded = run_id not in config['excluded_runs']
         conditions_checked = {
             "is_directory": subdir.is_dir(),
@@ -42,7 +42,7 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
         if all(conditions_met):
             logging.info(json.dumps({"event_type": "fastq_directory_found", "sequencing_run_id": run_id, "fastq_directory_path": os.path.abspath(subdir.path)}))
             pipeline_parameters['directory'] = os.path.abspath(subdir.path)
-            pipeline_parameters['outdir'] = os.path.join(analysis_outdir,run_id + '-' + pipeline_version + '-output')
+            pipeline_parameters['outdir'] = os.path.join(analysis_outdir,run_id,pipeline_short_name + '-' + pipeline_minor_version + '-output')
             pipeline_parameters['prefix'] = run_id
             yield pipeline_parameters
         else:
@@ -80,12 +80,10 @@ def analyze_run(config, run):
         pipeline_parameters = pipeline['pipeline_parameters']
         pipeline_short_name = pipeline['pipeline_name'].split('/')[1].replace('_', '-')
         pipeline_minor_version = '.'.join(pipeline['pipeline_version'].split('.')[0:2])
-        pipeline_version = pipeline['pipeline_version']
         analysis_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         analysis_run_id = os.path.basename(run['directory'])
         analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_run_id + '-' + analysis_timestamp))
-        #analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
-        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id + '-' + pipeline_version + '-output', analysis_run_id + '_trace.tsv'))
+        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
         pipeline_command = [
             'nextflow',
             'run',
@@ -111,7 +109,7 @@ def analyze_run(config, run):
             subprocess.run(pipeline_command, capture_output=True, check=True)
             logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
             analysis_tracking["timestamp_analysis_complete"] = datetime.datetime.now().isoformat()
-            analysis_complete_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id + '-' + pipeline_version + '-output', 'analysis_complete.json'))
+            analysis_complete_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', 'analysis_complete.json'))
             with open(analysis_complete_path, 'w') as f:
                     json.dump(analysis_tracking, f, indent=2)
                     f.write('\n')
