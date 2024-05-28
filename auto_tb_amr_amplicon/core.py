@@ -16,6 +16,9 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
     fastq_by_run_dir = config['fastq_by_run_dir']
     subdirs = os.scandir(fastq_by_run_dir)
     analysis_base_outdir = config['analysis_output_dir']
+    for pipeline in config['pipelines']:
+        pipeline_version = pipeline['pipeline_version']
+
     for subdir in subdirs:
         run_id = subdir.name
         analysis_outdir = os.path.abspath(os.path.join(analysis_base_outdir))
@@ -25,7 +28,7 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
             ready_to_analyze = os.path.exists(os.path.join(subdir.path, "symlinks_complete.json"))
         else:
             ready_to_analyze = True
-        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id))
+        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id + '-' + pipeline_version + '-output'))
         not_excluded = run_id not in config['excluded_runs']
         conditions_checked = {
             "is_directory": subdir.is_dir(),
@@ -38,8 +41,9 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
         pipeline_parameters = {}
         if all(conditions_met):
             logging.info(json.dumps({"event_type": "fastq_directory_found", "sequencing_run_id": run_id, "fastq_directory_path": os.path.abspath(subdir.path)}))
-            pipeline_parameters['fastq_input'] = os.path.abspath(subdir.path)
-            pipeline_parameters['outdir'] = analysis_outdir
+            pipeline_parameters['directory'] = os.path.abspath(subdir.path)
+            pipeline_parameters['outdir'] = os.path.join(analysis_outdir,run_id + '-' + pipeline_version + '-output')
+            pipeline_parameters['prefix'] = run_id
             yield pipeline_parameters
         else:
             logging.debug(json.dumps({"event_type": "directory_skipped", "fastq_directory_path": os.path.abspath(subdir.path), "conditions_checked": conditions_checked}))
@@ -76,10 +80,12 @@ def analyze_run(config, run):
         pipeline_parameters = pipeline['pipeline_parameters']
         pipeline_short_name = pipeline['pipeline_name'].split('/')[1].replace('_', '-')
         pipeline_minor_version = '.'.join(pipeline['pipeline_version'].split('.')[0:2])
+        pipeline_version = pipeline['pipeline_version']
         analysis_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-        analysis_run_id = os.path.basename(run['fastq_input'])
+        analysis_run_id = os.path.basename(run['directory'])
         analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_run_id + '-' + analysis_timestamp))
-        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
+        #analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
+        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id + '-' + pipeline_version + '-output', analysis_run_id + '_trace.tsv'))
         pipeline_command = [
             'nextflow',
             'run',
@@ -98,10 +104,17 @@ def analyze_run(config, run):
             else:
                 value = config_value
             pipeline_command += ['--' + flag, value]
+        analysis_tracking = {"timestamp_analysis_start": datetime.datetime.now().isoformat()}
+
         logging.info(json.dumps({"event_type": "analysis_started", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
         try:
             subprocess.run(pipeline_command, capture_output=True, check=True)
             logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
+            analysis_tracking["timestamp_analysis_complete"] = datetime.datetime.now().isoformat()
+            analysis_complete_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id + '-' + pipeline_version + '-output', 'analysis_complete.json'))
+            with open(analysis_complete_path, 'w') as f:
+                    json.dump(analysis_tracking, f, indent=2)
+                    f.write('\n')
             shutil.rmtree(analysis_work_dir, ignore_errors=True)
             logging.info(json.dumps({"event_type": "analysis_work_dir_deleted", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
         except subprocess.CalledProcessError as e:
