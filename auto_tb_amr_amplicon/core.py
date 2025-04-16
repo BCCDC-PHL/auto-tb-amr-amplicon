@@ -11,8 +11,8 @@ from typing import Iterator, Optional
 
 
 def find_fastq_dirs(config, check_symlinks_complete=True):
-    miseq_run_id_regex = "\d{6}_M\d{5}_\d+_\d{9}-[A-Z0-9]{5}"
-    nextseq_run_id_regex = "\d{6}_VH\d{5}_\d+_[A-Z0-9]{9}"
+    miseq_run_id_regex = "\\d{6}_M\\d{5}_\\d+_\\d{9}-[A-Z0-9]{5}"
+    nextseq_run_id_regex = "\\d{6}_VH\\d{5}_\\d+_[A-Z0-9]{9}"
     fastq_by_run_dir = config['fastq_by_run_dir']
     subdirs = os.scandir(fastq_by_run_dir)
     analysis_base_outdir = config['analysis_output_dir']
@@ -106,7 +106,8 @@ def analyze_run(config, run):
 
         logging.info(json.dumps({"event_type": "analysis_started", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
         try:
-            subprocess.run(pipeline_command, capture_output=True, check=True)
+            os.makedirs(analysis_work_dir)
+            subprocess.run(pipeline_command, capture_output=True, check=True, cwd=analysis_work_dir)
             logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
             analysis_tracking["timestamp_analysis_complete"] = datetime.datetime.now().isoformat()
             analysis_complete_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', 'analysis_complete.json'))
